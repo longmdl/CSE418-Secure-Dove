@@ -1,0 +1,27 @@
+# Secrets — never commit (run ./setup.sh to regenerate these locally)
+.env
+keys/*
+!keys/.gitkeep
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# User-uploaded content
+public/videos/*
+!public/videos/.gitkeep
+public/imgs/avatars/*
+!public/imgs/avatars/.gitkeep
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Claude Code
+.claude/
