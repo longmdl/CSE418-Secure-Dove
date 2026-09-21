@@ -13,7 +13,6 @@ COPY ./service/ ./service/
 COPY ./repository ./repository
 COPY ./keys/jwt_public.pem ./keys/jwt_public.pem
 
-#RUN apt-get update && apt-get install -y ffmpeg
 RUN pip3 install -r requirements.txt
 
 EXPOSE 8080

@@ -1,7 +1,5 @@
 import { html } from "./utils.js";
 
-let selectedMessage = null;
-
 async function fetchMessages() {
   const newMessages = await fetch("/api/chats").then((res) => res.json());
   newMessages.messages.forEach((message) => {
@@ -20,19 +18,10 @@ async function fetchMessages() {
             X
             </button>
           </div>
-          <img 
-            src="${message.imageURL}" 
-            alt="${message.author}'s avatar"
-            class="w-8 h-8 rounded-full bg-gray-200"
-          />
           <div class="relative flex flex-col h-full justify-center">
             <p>
               <div class="cursor-pointer message-content" id="${message.id}">
-                <span class="italic font-black group">
-                  <span class="group-hover:hidden">${message.nickname ? message.nickname : message.author
-      }</span>
-                  ${`<span class="hidden group-hover:inline font-light">${message.author}</span>`} :
-                </span>
+                <span class="italic font-black">${message.author} :</span>
                 <span 
                   >${message.content}</span
                 >
@@ -61,23 +50,6 @@ async function fetchMessages() {
                   <path d="m15 5 4 4" />
                 </svg>
               </button>
-              <!-- This is emoji div, converts map to array, loops through adds badge for each emoji-->
-              <div class="flex flex-wrap gap-1 mt-1">
-                ${Object.entries(message.reactions || {})
-        .map(
-          ([emoji, users]) => `
-                  <button onclick="removeReaction(
-                    '${message.id}'
-                  , '${emoji}')" class="px-2 py-0.5 rounded-full text-sm bg-gray-600">
-                    ${users.length > 1
-              ? `<span class="mr-1">${users.length}</span>`
-              : ""
-            }${emoji}
-                  </button>
-                `
-        )
-        .join("")}
-              </div>
             </p>
           </div>
         </div>
@@ -143,100 +115,11 @@ async function fetchMessages() {
     }
   });
 
-  // Add onclick function for toggling the emoji picker
-  const messageContent = document.querySelectorAll(".message-content");
-  const tooltip = document.querySelector("#emoji-tooltip");
-  messageContent.forEach((div) => {
-    div.onclick = () => {
-      // Toggle the emoji tooltip
-      const messageId = div.id;
-      console.log("Message Contet Clicked: ", messageId);
-      selectedMessage = messageId;
-      closeTooltip();
-    };
-  });
 }
-
-// Listener for emoji selection
-document
-  .querySelector("emoji-picker")
-  .addEventListener("emoji-click", (event) => {
-    console.log(event.detail);
-    closeTooltip();
-    addReaction(selectedMessage, event.detail.unicode);
-    selectedMessage = null;
-  });
-
-const closeTooltip = () => {
-  const tooltip = document.querySelector("#emoji-tooltip");
-  tooltip.style.display = tooltip.style.display === "none" ? "block" : "none";
-};
-window.closeTooltip = closeTooltip; // Make global
 
 fetchMessages();
 setInterval(fetchMessages, 1000);
 let isEditing = null;
-
-// Way to add emoji
-async function addReaction(messageId, emoji) {
-  console.log("Add reaction: ", emoji, messageId);
-  try {
-    const response = await fetch(`/api/reaction/${messageId}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ emoji: emoji }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      alertManager.newAlert(errorText, "error", 5000, "Failed to Add Reaction");
-      return;
-    }
-  } catch (error) {
-    alertManager.newAlert(
-      "Failed to add reaction. Please try again.",
-      "error",
-      5000,
-      "Error"
-    );
-  }
-}
-
-// Way to remove emoji
-async function removeReaction(messageId, emoji) {
-  console.log("Removing reaction: ", emoji, messageId);
-  try {
-    const response = await fetch(`/api/reaction/${messageId}`, {
-      method: "DELETE",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ emoji: emoji }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      alertManager.newAlert(
-        errorText,
-        "error",
-        5000,
-        "Failed to Remove Reaction"
-      );
-      return;
-    }
-  } catch (error) {
-    alertManager.newAlert(
-      "Failed to Remove reaction. Please try again.",
-      "error",
-      5000,
-      "Error"
-    );
-  }
-}
-
-window.removeReaction = removeReaction; // Make global
 
 function editMessage(messageId) {
   document.getElementById(`message-${messageId}`).classList.add("hidden");
@@ -352,52 +235,3 @@ window.deleteMessage = deleteMessage;
 window.editMessage = editMessage;
 window.submitEdit = submitEdit;
 window.cancelEdit = cancelEdit;
-
-async function changeNickName(event) {
-  event.preventDefault(); // Prevent form submission
-  const input = document.getElementById("nickname-input");
-  const dialog = document.getElementById("nickname-dialog");
-  const nickName = input.value.trim();
-
-  if (!nickName) {
-    alertManager.newAlert("Nickname cannot be empty", "error", 5000, "Error");
-    return;
-  }
-
-  try {
-    const response = await fetch(`/api/nickname`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ nickname: nickName }),
-    });
-    if (!response.ok) {
-      const errorText = await response.text();
-      alertManager.newAlert(
-        errorText,
-        "error",
-        5000,
-        "Failed to Change NickName"
-      );
-      return;
-    }
-    dialog.close();
-    input.value = "";
-  } catch (error) {
-    alertManager.newAlert(
-      "Failed to Change NickName. Please try again.",
-      "error",
-      5000,
-      "Error"
-    );
-  }
-}
-
-function openNicknameDialog() {
-  const dialog = document.getElementById("nickname-dialog");
-  dialog.showModal();
-}
-
-window.changeNickName = changeNickName;
-window.openNicknameDialog = openNicknameDialog;

@@ -34,7 +34,6 @@ def websocket_controller(request, handler):
 
     perform_handshake(handler, ws_key)
     ws_service.register(handler, username)
-    ws_service.send_initial_state(handler)
     run_receive_loop(handler)
     ws_service.unregister(handler)
 

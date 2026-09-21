@@ -1,7 +1,4 @@
 pymongo
 bcrypt
 pyotp
-requests
-python-dotenv
-ffmpeg-python
 pyjwt[crypto]

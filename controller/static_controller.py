@@ -22,12 +22,6 @@ def static_controller(request, handler):
         mime_type = "image/x-icon"
     elif ".webp" in path:
         mime_type = "image/webp"
-    elif ".mp4" in path:
-        mime_type = "video/mp4"
-    elif ".m3u8" in path:
-        mime_type = "application/vnd.apple.mpegurl"
-    elif ".ts" in path:
-        mime_type = "video/mp2t"
 
     if static_service(path) == b"file not found": #if file is not found, send back 404 not found
         res.set_status(404, "Not Found")
