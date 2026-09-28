@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>crypto-service tests (SD-04)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; }
+  .pass { color: #0a7a2f; }
+  .fail { color: #b00020; font-weight: 600; }
+  li { margin: 0.15rem 0; }
+  textarea, input[type=text] { width: 100%; box-sizing: border-box; font-family: ui-monospace, monospace; font-size: 0.85rem; }
+  textarea { height: 6.5rem; }
+  button { margin: 0.4rem 0.4rem 0.4rem 0; padding: 0.35rem 0.8rem; }
+  label { display: block; margin-top: 0.6rem; font-weight: 600; }
+  .note { color: #555; font-size: 0.9rem; }
+  #summary { font-weight: 600; margin: 0.5rem 0; }
+</style>
+</head>
+<body>
+<h1>crypto-service.js tests (SD-04)</h1>
+<p class="note">
+  Serve the repo root over localhost (WebCrypto only works on https or localhost):<br>
+  <code>python3 -m http.server 9000</code>, then open
+  <code>http://localhost:9000/tests/crypto/browser-test.html</code>.
+</p>
+
+<h2>1. Unit tests</h2>
+<div id="summary">Running...</div>
+<ul id="results"></ul>
+
+<h2>2. Cross-profile test (seal in one browser profile, open in another)</h2>
+<p class="note">
+  Uses two fixed <strong>test-only</strong> keypairs (Alice and Bob) from <code>test-keys.js</code>.
+  Open this page in two different browser profiles (or Chrome and Firefox).
+  In profile 1, seal a message as Alice to Bob and copy the JSON. In profile 2, paste it and open it as Bob.
+  The text must come back byte-identical.
+</p>
+
+<label for="convId">Conversation id</label>
+<input type="text" id="convId" value="conv-cross-profile-1">
+
+<label for="msgText">Message text</label>
+<input type="text" id="msgText" value="Xin chào 👋 你好 — byte-identical?">
+<button id="sealBtn">Seal as Alice → Bob</button>
+
+<label for="sealedOut">Sealed JSON (copy this)</label>
+<textarea id="sealedOut" readonly></textarea>
+
+<label for="sealedIn">Paste sealed JSON here</label>
+<textarea id="sealedIn"></textarea>
+<button id="openBtn">Open as Bob</button>
+
+<label for="openedOut">Result</label>
+<textarea id="openedOut" readonly></textarea>
+
+<script type="module">
+  import { runAll } from "./crypto-service.test.js";
+  import { deriveConversationKey, seal, open } from "../../public/js/crypto-service.js";
+  import { ALICE, BOB } from "./test-keys.js";
+
+  const list = document.getElementById("results");
+  const summary = document.getElementById("summary");
+  const results = await runAll((r) => {
+    const li = document.createElement("li");
+    li.className = r.ok ? "pass" : "fail";
+    li.textContent = (r.ok ? "PASS  " : "FAIL  ") + r.name + (r.ok ? "" : "  -> " + r.error);
+    list.appendChild(li);
+  });
+  const failed = results.filter((r) => !r.ok).length;
+  summary.textContent = failed === 0
+    ? "All " + results.length + " tests passed."
+    : failed + " of " + results.length + " tests failed.";
+  summary.className = failed === 0 ? "pass" : "fail";
+
+  const ecdh = { name: "ECDH", namedCurve: "P-256" };
+  const importPrivate = (jwk) => crypto.subtle.importKey("jwk", jwk, ecdh, false, ["deriveBits"]);
+  const importPublic = (jwk) => crypto.subtle.importKey("jwk", jwk, ecdh, true, []);
+
+  const [alicePriv, alicePub, bobPriv, bobPub] = await Promise.all([
+    importPrivate(ALICE.privateJwk), importPublic(ALICE.publicJwk),
+    importPrivate(BOB.privateJwk), importPublic(BOB.publicJwk),
+  ]);
+
+  document.getElementById("sealBtn").addEventListener("click", async () => {
+    const out = document.getElementById("sealedOut");
+    try {
+      const key = await deriveConversationKey({
+        myPrivateKey: alicePriv, theirPublicKey: bobPub,
+        myUserId: ALICE.id, theirUserId: BOB.id,
+      });
+      const sealed = await seal(key, document.getElementById("convId").value, {
+        text: document.getElementById("msgText").value,
+        seq: 1, sentAt: Date.now(), senderId: ALICE.id,
+      });
+      out.value = JSON.stringify(sealed);
+    } catch (e) { out.value = "Error: " + e.message; }
+  });
+
+  document.getElementById("openBtn").addEventListener("click", async () => {
+    const out = document.getElementById("openedOut");
+    try {
+      const key = await deriveConversationKey({
+        myPrivateKey: bobPriv, theirPublicKey: alicePub,
+        myUserId: BOB.id, theirUserId: ALICE.id,
+      });
+      const sealed = JSON.parse(document.getElementById("sealedIn").value);
+      const payload = await open(key, document.getElementById("convId").value, sealed);
+      out.value = "OK\n" + JSON.stringify(payload, null, 2);
+    } catch (e) { out.value = "FAILED: " + e.message; }
+  });
+</script>
+</body>
+</html>
+
+
+<!--
+  // Part 1 runs the same unit tests as run-node.mjs, in the browser, and shows PASS or FAIL per test.
+  // Part 2 is the cross-profile check. Seal encrypts as Alice to Bob with the fixed test keys
+  //   and shows the sealed JSON. Open decrypts it as Bob. Seal in one browser profile, paste the
+  //   JSON into another, and the text should come back identical.
+  // Private keys are imported as non-extractable, the way SD-03 will store them.
+  // Change the conversation id before opening to see the wrong-conversation failure.
+-->
+
