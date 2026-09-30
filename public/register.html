@@ -93,8 +93,13 @@
           });
         }
 
-        //Go to login page is signup was successful
-        window.location.href = "/login";
+        //SD-03: enrol this device's key while the new session cookie is live,
+        //then go to the login page
+        return import("/public/js/enroll.js")
+          .then((m) => m.ensureEnrolledOrExplain())
+          .then(() => {
+            window.location.href = "/login";
+          });
       })
       .catch((error) => {
         console.log("Error: ", error.message);
