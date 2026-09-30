@@ -17,5 +17,4 @@ db = mongo_client["cse418"]
 
 chat_collection = db["chat"]
 user_collection = db["user"]
-videos_collection = db["video"]
-drawings_collection = db["drawings"] 
+public_keys_collection = db["public_keys"] 

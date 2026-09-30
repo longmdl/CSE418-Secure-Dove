@@ -24,4 +24,11 @@
   </form>
 </div>
 
+<script type="module">
+  // SD-03: this browser needs a device key before it can take part in a
+  // conversation. Idempotent, so running it on every load is fine.
+  import { ensureEnrolledOrExplain } from "/public/js/enroll.js";
+  ensureEnrolledOrExplain();
+</script>
+
 <script src="/public/js/chat.js" type="module"></script>
