@@ -66,15 +66,6 @@ over plain HTTP, so you'll never stay logged in there. Always use `https://local
 A successful login sets an `auth_token` cookie holding an RS256 JWT that lasts 1 hour. Only
 `auth_server` holds the private key; `myapp` only verifies.
 
-## Scope
-
-This is a messenger and nothing else. VideoTube, the drawing board, video calls, avatar uploads,
-message reactions, nicknames and GitHub OAuth were all removed — they were not part of SecureDove,
-and GitHub login in particular authenticated on username alone, which let a pre-registered account be
-taken over. See `docs/sprint-backlog.md`.
-
-Chat today is still a single room stored as readable text. Replacing it with per-conversation,
-end-to-end encrypted messaging is the work the backlog describes.
 
 ## Running without Docker
 
