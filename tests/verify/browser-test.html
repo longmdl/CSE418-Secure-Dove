@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>fingerprint tests</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; }
+  .pass { color: #0a7a2f; }
+  .fail { color: #b00020; font-weight: 600; }
+  li { margin: 0.15rem 0; }
+  button, input[type=text] { margin: 0.3rem 0.3rem 0.3rem 0; padding: 0.35rem 0.6rem; }
+  code { background: #f4f4f4; padding: 0 0.2rem; }
+  .note { color: #555; font-size: 0.9rem; }
+  #summary, #round-trip-summary { font-weight: 600; margin: 0.5rem 0; }
+  .fingerprint-row { display: flex; gap: 0.6rem; align-items: baseline; margin: 0.3rem 0; }
+  .fingerprint-label { color: #555; min-width: 11rem; }
+  .fingerprint-value { font-family: ui-monospace, Consolas, monospace; }
+  .fingerprint-note { color: #555; font-size: 0.85rem; margin-top: 0.2rem; }
+</style>
+</head>
+<body>
+<h1>fingerprint tests</h1>
+<p class="note">
+  to run this: open a terminal in the repo folder and run
+  <code>python3 -m http.server 9000</code>, then go to
+  <code>http://localhost:9000/tests/verify/browser-test.html</code>
+</p>
+
+<h2>1. the same tests as run-node.mjs, but in the browser</h2>
+<div id="summary">running...</div>
+<ul id="results"></ul>
+
+<h2>2. what the fingerprint actually looks like on screen</h2>
+<p class="note">this part just checks the fingerprint shows up correctly, no server needed</p>
+<div id="render-demo"></div>
+<div id="render-check"></div>
+
+<h2>3. checking it with the real app running</h2>
+<p class="note">
+  this part only works if you open this page through the real running app, while logged in.
+  easiest way to really prove it works: log into two different accounts in two browser windows,
+  and check that your fingerprint on one account matches what the other account sees when it
+  looks you up. they should be exactly the same.
+</p>
+<div id="round-trip-summary"></div>
+
+<script type="module">
+  import { runAll } from "./contact-verifier.test.js";
+  import { renderMyFingerprint as showMyFingerprint } from "/public/js/contact-verifier.js";
+
+  // part 1: run the tests and show pass/fail for each one
+  const list = document.getElementById("results");
+  const summary = document.getElementById("summary");
+  const results = await runAll((r) => {
+    const li = document.createElement("li");
+    li.className = r.ok ? "pass" : "fail";
+    li.textContent = (r.ok ? "PASS  " : "FAIL  ") + r.name + (r.ok ? "" : "  -> " + r.error);
+    list.appendChild(li);
+  });
+  const failedCount = results.filter((r) => !r.ok).length;
+  summary.textContent = failedCount === 0
+    ? "all " + results.length + " tests passed"
+    : failedCount + " of " + results.length + " tests failed";
+  summary.className = failedCount === 0 ? "pass" : "fail";
+
+  // part 2: show what the fingerprint looks like, using a made-up example
+  // (this is the same look the real contact-verifier.js code produces)
+  function makeRow(label, value) {
+    const wrap = document.createElement("div");
+    wrap.className = "fingerprint-row";
+    const labelEl = document.createElement("div");
+    labelEl.className = "fingerprint-label";
+    labelEl.textContent = label;
+    const valueEl = document.createElement("div");
+    valueEl.className = "fingerprint-value";
+    valueEl.textContent = value;
+    valueEl.style.userSelect = "text";
+    valueEl.tabIndex = 0;
+    wrap.appendChild(labelEl);
+    wrap.appendChild(valueEl);
+    return wrap;
+  }
+  function makeNote(text) {
+    const p = document.createElement("div");
+    p.className = "fingerprint-note";
+    p.textContent = text;
+    return p;
+  }
+
+  const exampleFingerprint = "4B2E 9C71 08A5 DD3F 1A6B 77C0 E92D 4F58 B301 6DCA 82EE 1957 C40B F6A3 9D2C 5E81";
+  const demoBox = document.getElementById("render-demo");
+  demoBox.appendChild(makeRow("Your fingerprint", exampleFingerprint));
+  demoBox.appendChild(makeNote("Compare this with your contact, over a call or in person. It should match exactly."));
+
+  const checkBox = document.getElementById("render-check");
+  const valueElInDemo = demoBox.querySelector(".fingerprint-value");
+  const checksToShow = [
+    ["text is selectable", valueElInDemo.style.userSelect !== "none"],
+    ["shows the exact fingerprint we passed in", valueElInDemo.textContent === exampleFingerprint],
+    ["has the compare-with-your-contact note", !!demoBox.querySelector(".fingerprint-note")],
+  ];
+  for (const [name, ok] of checksToShow) {
+    const li = document.createElement("li");
+    li.className = ok ? "pass" : "fail";
+    li.textContent = (ok ? "PASS  " : "FAIL  ") + name;
+    checkBox.appendChild(li);
+  }
+
+  // part 3: if this page is actually being served by the real app and
+  // someone is logged in, show their real fingerprint
+  const roundTripBox = document.getElementById("round-trip-summary");
+  try {
+    const me = await (await fetch("/api/users/@me")).json();
+    if (me && me.id) {
+      const box = document.createElement("div");
+      await showMyFingerprint(box, me.id);
+      roundTripBox.appendChild(document.createTextNode("logged in, here's your fingerprint: "));
+      roundTripBox.appendChild(box);
+    } else {
+      roundTripBox.textContent = "not logged in on this page - see the steps above instead";
+    }
+  } catch {
+    roundTripBox.textContent = "this page isn't being served by the real app right now - see the steps above instead";
+  }
+</script>
+</body>
+</html>
