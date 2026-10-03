@@ -10,6 +10,8 @@ def get_user_profile(username):
 
 def get_user_search(query):
     users_result = search_users_db(query) #pass the search query to db, will return a dict of user with that name
+    if users_result is None: #if search query too long as indicated in auth_repository.py 
+        return None
     result = []
     for user in users_result:
         result.append({
