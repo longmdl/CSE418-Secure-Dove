@@ -42,19 +42,13 @@ def auth_controller(request, handler):
             if len(user_parts) == 2 and user_parts[0] == "user":
                 query = user_parts[1] #extract the search query
 
-        if not query.strip(): #.strip() trims whitespace in case an "empty" query is all whitespace
+        if not query:
             res.set_status(200, "OK")
             res.json({"users": []}) #send back empty list if query is empty
             handler.request.sendall(res.to_data())
             return
 
         users = get_user_search(query)
-        if users is None: #if search is too long (>=33)
-            res.set_status(400, "Bad Request")
-            res.json({"users": []}) #send back empty users list
-            handler.request.sendall(res.to_data())
-            return 
-            
         res.set_status(200, "OK")
         res.json({"users": users}) #send back users list
         handler.request.sendall(res.to_data())

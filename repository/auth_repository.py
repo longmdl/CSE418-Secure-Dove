@@ -3,7 +3,6 @@ from util.database import user_collection
 
 import bcrypt
 import pyotp
-import re 
 
 def enable_otp_db(username):
     totp_secret = pyotp.random_base32()
@@ -34,9 +33,7 @@ def get_user_profile_db(username):
     return None
 
 def search_users_db(search):
-    if len (search) > 32: #to prohibit searches len >= 33
-        return None
-    users = user_collection.find({"username": {"$regex": "^" + re.escape(search)}}) #case sensitive search
+    users = user_collection.find({"username": {"$regex": "^" + search}}) #case sensitive search
     return users
 
 def update_profile_db(old_username, new_username, password_bytes, salt):
