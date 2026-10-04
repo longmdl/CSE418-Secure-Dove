@@ -8,6 +8,7 @@ from util.response import Response
 from util.auth import extract_credentials, validate_password
 from util.database import user_collection
 from repository.auth_repository import register_user_db
+from repository.login_failure_repository import is_locked_out_db, record_failed_login_db, reset_failed_logins_db
 
 
 with open("/root/keys/jwt_private.pem", "rb") as f: 
@@ -64,14 +65,22 @@ def auth_controller(request, handler):
         password = credentials[1]
         totp_code = credentials[2] if len(credentials) > 2 else None
 
+        if is_locked_out_db(username): #SD-12: same generic 429 as nginx, whether or not the account exists
+            res.set_status(429, "Too Many Requests")
+            res.text("too many requests, try again later")
+            handler.request.sendall(res.to_data())
+            return
+
         user = user_collection.find_one({"username": username})
         if not user:
+            record_failed_login_db(username) #unknown names count too, so a lockout doesn't reveal which accounts exist
             res.set_status(400, "Bad Request")
             res.text("user failed to login")
             handler.request.sendall(res.to_data())
             return
 
         if not bcrypt.checkpw(password.encode(), user["password"]):
+            record_failed_login_db(username)
             res.set_status(400, "Bad Request")
             res.text("user failed to login")
             handler.request.sendall(res.to_data())
@@ -85,11 +94,13 @@ def auth_controller(request, handler):
                 handler.request.sendall(res.to_data())
                 return
             if not pyotp.TOTP(totp_secret).verify(totp_code):
+                record_failed_login_db(username)
                 res.set_status(400, "Bad Request")
                 res.text("user failed to login")
                 handler.request.sendall(res.to_data())
                 return
 
+        reset_failed_logins_db(username) #a successful login clears the failure count
         token = issue_jwt(user["id"], user["username"])
         res.set_status(200, "OK")
         res.text("user logged in successfully")

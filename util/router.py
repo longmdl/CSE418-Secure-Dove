@@ -11,15 +11,24 @@ class Router:
         pass
 
     def route_request(self, request, handler):
-        for route in self.all_routes:
-            if request.method == route["method"] and request.path == route["path"] and route["exact_path"] == True:
-                action =  route["action"]
-                action(request, handler)
-                return
-            elif request.method == route["method"] and request.path.startswith(route["path"]) and route["exact_path"] == False:
-                action = route["action"]
-                action(request, handler)
-                return
+        try: #implement top level error handler to wrap every route 
+            for route in self.all_routes:
+                if request.method == route["method"] and request.path == route["path"] and route["exact_path"] == True:
+                    action =  route["action"]
+                    action(request, handler)
+                    return
+                elif request.method == route["method"] and request.path.startswith(route["path"]) and route["exact_path"] == False:
+                    action = route["action"]
+                    action(request, handler)
+                    return
+        except Exception as e:
+            print("Unexpected error:", e)
+            response = Response()
+            response.set_status(500, "Unexpected Error")
+            response.json({"error": "Unexpected Error"})
+            handler.request.sendall(response.to_data())
+            return 
+            
 
         response = Response()
         response.set_status(404, "Not Found")

@@ -42,13 +42,19 @@ def auth_controller(request, handler):
             if len(user_parts) == 2 and user_parts[0] == "user":
                 query = user_parts[1] #extract the search query
 
-        if not query:
+        if not query.strip(): #.strip() trims whitespace in case an "empty" query is all whitespace
             res.set_status(200, "OK")
             res.json({"users": []}) #send back empty list if query is empty
             handler.request.sendall(res.to_data())
             return
 
         users = get_user_search(query)
+        if users is None: #if search is too long (>=33)
+            res.set_status(400, "Bad Request")
+            res.json({"users": []}) #send back empty users list
+            handler.request.sendall(res.to_data())
+            return 
+            
         res.set_status(200, "OK")
         res.json({"users": users}) #send back users list
         handler.request.sendall(res.to_data())
@@ -56,16 +62,16 @@ def auth_controller(request, handler):
 
     if method == "POST" and path == "/api/users/settings": #update current user profile
         auth_token = cookies.get("auth_token", "")
-        payload = verify_jwt(auth_token) #get current username from auth token
-        old_username = payload.get("username") if payload else None
+        payload = verify_jwt(auth_token)
+        user_id = payload.get("sub") if payload else None
 
-        if not old_username:
+        if not user_id:
             res.set_status(401, "Unauthorized") #not logged in
             res.text("Must be logged in")
             handler.request.sendall(res.to_data())
             return
 
-        result = update_user_profile(old_username, request) #pass it on to service layer
+        result = update_user_profile(user_id, request) #pass it on to service layer
         if result:
             res.set_status(200, "OK")
             res.text("information updated succesfully")
