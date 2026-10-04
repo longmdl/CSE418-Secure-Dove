@@ -2,10 +2,14 @@ import { getPrivateKey } from "./keystore.js";
 import { fetchPeerKey } from "./key-api.js";
 import { deriveConversationKey, seal, open } from "./crypto-service.js";
 
-// Cache the recipient's public key per conversation.
-// This prevents fetching the same public key before every message.
+//Cache the recipient's public key per conversation.
+//this prevents fetching the same public key before every message.
 const peerKeyCache = new Map();
 
+//Gets and caches the other user's public encryption key for a conversation.
+//Parameters:
+    //conversationId: ID of the conversation the public key will be used for.
+    //otherUserId: ID of the other user whose public key is needed.
 async function getPeerKeyForConversation(conversationId, otherUserId) {
   if (peerKeyCache.has(conversationId)) {
     return peerKeyCache.get(conversationId);
@@ -18,13 +22,13 @@ async function getPeerKeyForConversation(conversationId, otherUserId) {
   return peerKey;
 }
 
-// IndexedDB storage for each sender's message sequence number.
-// The value survives page reloads so a sender never intentionally
-// starts over at sequence 1 after refreshing.
+//IndexedDB storage for each sender's message sequence number.
+//The value survives page reloads so a sender never intentionally starts over at sequence 1 after refreshing.
 const SEQ_DB_NAME = "securedove-sequences";
 const SEQ_DB_VERSION = 1;
 const SEQ_STORE = "sequences";
 
+//Opens the IndexedDB database used to store message sequence numbers.
 function openSequenceDb() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(SEQ_DB_NAME, SEQ_DB_VERSION);
@@ -44,6 +48,9 @@ function openSequenceDb() {
   });
 }
 
+//Gets and saves the next message sequence number for a user.
+//Parameters:
+    //userId: ID of the user whose next sequence number is needed.
 async function nextSequence(userId) {
   const db = await openSequenceDb();
 
@@ -52,6 +59,7 @@ async function nextSequence(userId) {
       const transaction = db.transaction(SEQ_STORE, "readwrite");
       const store = transaction.objectStore(SEQ_STORE);
 
+      //Key used to store this user's sequence number in IndexedDB.
       const key = "seq:" + userId;
       const getRequest = store.get(key);
 
@@ -60,6 +68,7 @@ async function nextSequence(userId) {
       };
 
       getRequest.onsuccess = () => {
+        //Start at 0 if no sequence exists yet, then increment before using it.
         const current = getRequest.result || 0;
         const next = current + 1;
 
@@ -79,35 +88,41 @@ async function nextSequence(userId) {
   }
 }
 
+//Encrypts a private message in the user's browser before it is sent to the server.
+//Parameters:
+    //conversationId: ID of the conversation receiving the message.
+    //myUserId: ID of the user sending the message.
+    //otherUserId: ID of the other user in the conversation.
+    //text: Readable message text that will be encrypted.
 export async function sendEncryptedMessage({
   conversationId,
   myUserId,
   otherUserId,
   text
 }) {
-  // Do not encrypt or send empty/whitespace-only messages.
+  //Do not encrypt or send empty/whitespace-only messages.
   if (typeof text !== "string" || text.trim().length === 0) {
     throw new Error("Message cannot be empty.");
   }
 
-  // Block oversized messages before encryption.
+  //Block oversized messages before encryption.
   const textBytes = new TextEncoder().encode(text);
 
   if (textBytes.length > 10 * 1024) {
     throw new Error("Message is too large.");
   }
 
-  // Get this device's private key.
+  //Get this device's private key.
   const myPrivateKey = await getPrivateKey(myUserId);
 
-  // Fetch the recipient's public key once per conversation.
-  // If this fails, sending stops here. Plaintext is never sent.
+  //Fetch the recipient's public key once per conversation.
+  //If this fails, sending stops here. Plaintext is never sent.
   const peer = await getPeerKeyForConversation(
     conversationId,
     otherUserId
   );
 
-  // Derive the shared AES encryption key.
+  //Finds the shared AES encryption key.
   const conversationKey = await deriveConversationKey({
     myPrivateKey,
     theirPublicKey: peer.publicKey,
@@ -115,10 +130,10 @@ export async function sendEncryptedMessage({
     theirUserId: otherUserId
   });
 
-  // Allocate the next persistent sequence number.
+  //Allocate the next persistent sequence number.
   const seq = await nextSequence(myUserId);
 
-  // Encrypt the plaintext locally in the browser.
+  //Encrypt the plaintext locally in the browser.
   const encrypted = await seal(
     conversationKey,
     conversationId,
@@ -139,6 +154,10 @@ export async function sendEncryptedMessage({
   return envelope;
 }
 
+//Sends an encrypted message envelope to the server and checks whether it was stored.
+//Parameters:
+    //conversationId: ID of the conversation receiving the message.
+    //envelope: Encrypted message containing ciphertext, IV, and sequence number.
 export async function postEncryptedMessage(conversationId, envelope) {
   const response = await fetch(
     "/api/conversations/" + encodeURIComponent(conversationId) + "/messages",
@@ -148,7 +167,7 @@ export async function postEncryptedMessage(conversationId, envelope) {
         "Content-Type": "application/json"
       },
 
-      // Only encrypted data is sent to the server.
+      //Only encrypted data is sent to the server.
       body: JSON.stringify({
         ciphertext: envelope.ciphertext,
         iv: envelope.iv,
@@ -157,8 +176,8 @@ export async function postEncryptedMessage(conversationId, envelope) {
     }
   );
 
-  // A duplicate means this exact sequence number was already stored.
-  // This can happen when retrying after the original response was lost.
+  //A duplicate means this exact sequence number was already stored.
+  //This can happen when retrying after the original response was lost.
   if (response.status === 409) {
     return {
       sent: true,
@@ -166,7 +185,7 @@ export async function postEncryptedMessage(conversationId, envelope) {
     };
   }
 
-  // Any other failed request remains unsent.
+  //Any other failed request remains unsent.
   if (!response.ok) {
     return {
       sent: false,
@@ -176,8 +195,8 @@ export async function postEncryptedMessage(conversationId, envelope) {
 
   const storedMessage = await response.json();
 
-  // Do not mark the message sent unless the server returned
-  // the stored message ID and server-generated timestamp.
+  //Do not mark the message sent unless the server returned
+  //the stored message ID and server-generated timestamp.
   if (!storedMessage.id || !storedMessage.timestamp) {
     return {
       sent: false,
@@ -193,6 +212,11 @@ export async function postEncryptedMessage(conversationId, envelope) {
   };
 }
 
+//Displays a failed message as unsent and gives the user a button to retry it.
+//Parameters:
+    //text: Readable message text displayed to the user.
+    //conversationId: ID of the conversation the message belongs to.
+    //envelope: Original encrypted message that will be reused if Retry is clicked.
 function showUnsentMessage(text, conversationId, envelope) {
   const messageElement = document.createElement("div");
 
@@ -208,7 +232,7 @@ function showUnsentMessage(text, conversationId, envelope) {
     retryButton.textContent = "Retrying...";
 
     try {
-      // Reuse the exact same ciphertext, IV, and sequence number.
+      //Reuse the exact same ciphertext, IV, and sequence number.
       const result = await postEncryptedMessage(
         conversationId,
         envelope
@@ -232,10 +256,10 @@ function showUnsentMessage(text, conversationId, envelope) {
 
   messageElement.appendChild(textElement);
   messageElement.appendChild(retryButton);
-
   privateMessages.appendChild(messageElement);
 }
 
+//Information about the private conversation currently open in the user's browser.
 let activeConversationId = null;
 let activeOtherUserId = null;
 let activeOtherUsername = null;
@@ -290,6 +314,7 @@ const privateMessageForm = document.getElementById("private-message-form");
 const privateMessageInput = document.getElementById("private-message");
 const privateMessages = document.getElementById("private-messages");
 
+//Gets the currently authenticated user's ID and username from the server.
 async function getMyUser() {
   const response = await fetch("/api/users/@me");
 
@@ -310,6 +335,9 @@ async function getMyUser() {
   return user;
 }
 
+//Gets the other participant's username for a conversation.
+//Parameters:
+    //conversationId: ID of the conversation whose other participant is needed.
 async function getOtherUsername(conversationId) {
   const response = await fetch("/api/conversations");
 
@@ -334,6 +362,12 @@ async function getOtherUsername(conversationId) {
   return conversation.other_participant.username;
 }
 
+//Loads, decrypts, and displays the encrypted message history for a conversation.
+//Parameters:
+    //conversationId: ID of the conversation whose history is being loaded.
+    //myUser: ID and username information for the authenticated user.
+    //otherUserId: ID of the other participant.
+    //otherUsername: Username of the other participant.
 async function loadMessageHistory(conversationId, myUser, otherUserId, otherUsername) {
   const response = await fetch(
     "/api/conversations/" +
@@ -347,7 +381,7 @@ async function loadMessageHistory(conversationId, myUser, otherUserId, otherUser
 
   const data = await response.json();
 
-  // Get the keys needed to decrypt this conversation.
+  //Get the keys needed to decrypt this conversation.
   const myPrivateKey = await getPrivateKey(myUser.id);
 
   const peer = await getPeerKeyForConversation(
@@ -357,7 +391,7 @@ async function loadMessageHistory(conversationId, myUser, otherUserId, otherUser
 
   const conversationKey = await deriveConversationKey({myPrivateKey, theirPublicKey: peer.publicKey, myUserId: myUser.id, theirUserId: otherUserId});
 
-  // Clear messages from the previously opened conversation.
+  //Clear messages from the previously opened conversation.
   privateMessages.replaceChildren();
 
   for (const message of data.messages) {
@@ -371,7 +405,7 @@ async function loadMessageHistory(conversationId, myUser, otherUserId, otherUser
         }
       );
 
-      // Make sure encrypted metadata agrees with the server envelope.
+      //Make sure encrypted metadata agrees with the server envelope.
       if (
         payload.senderId !== message.sender_id ||
         payload.seq !== message.seq
@@ -415,7 +449,7 @@ privateMessageForm.addEventListener("submit", async (event) => {
 
   const text = privateMessageInput.value;
 
-  // Keep the encrypted envelope available in case sending fails.
+  //Keep the encrypted envelope available in case sending fails.
   let envelope = null;
 
   try {
@@ -424,8 +458,8 @@ privateMessageForm.addEventListener("submit", async (event) => {
     const myUser = await getMyUser();
     const myUserId = myUser.id;
 
-    // Encrypt the message locally.
-    envelope = await sendEncryptedMessage({
+    //Encrypt the message locally.
+    envelope = await sendEncryptedMessage({ 
       conversationId: activeConversationId,
       myUserId: myUserId,
       otherUserId: activeOtherUserId,
@@ -434,7 +468,7 @@ privateMessageForm.addEventListener("submit", async (event) => {
 
     privateChatStatus.textContent = "Sending encrypted message...";
 
-    // Only the encrypted envelope is sent to the server.
+    //Only the encrypted envelope is sent to the server.
     const result = await postEncryptedMessage(
       activeConversationId,
       envelope
@@ -447,7 +481,7 @@ privateMessageForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    // Only display the message as sent after server confirmation.
+    //Only display the message as sent after server confirmation.
     const messageElement = document.createElement("div");
     const senderElement = document.createElement("strong");
 
@@ -464,8 +498,8 @@ privateMessageForm.addEventListener("submit", async (event) => {
     privateChatStatus.textContent = "Message sent.";
 
   } catch (error) {
-    // If encryption succeeded but sending failed, preserve the exact
-    // ciphertext, IV, and sequence number so Retry can resend them.
+    //If encryption succeeded but sending failed, preserve the exact
+    //ciphertext, IV, and sequence number so Retry can resend them.
     if (envelope !== null) {
       showUnsentMessage(text, activeConversationId, envelope);
       privateMessageInput.value = "";
@@ -473,22 +507,19 @@ privateMessageForm.addEventListener("submit", async (event) => {
       return;
     }
 
-    // Encryption/key setup failed, so there is no encrypted message to retry.
+    //Encryption/key setup failed, so there is no encrypted message to retry.
     privateChatStatus.textContent =
       error.message || "Could not encrypt message.";
   }
 });
 
+//Connects to the private-message WebSocket and handles incoming encrypted messages.
 function connectPrivateWebSocket() {
   const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
 
   const socket = new WebSocket(
     protocol + "//" + window.location.host + "/websocket"
   );
-
-  socket.addEventListener("open", () => {
-    console.log("Private message WebSocket connected.");
-  });
 
   socket.addEventListener("message", async (event) => {
     let data;
@@ -499,7 +530,7 @@ function connectPrivateWebSocket() {
       return;
     }
 
-    // Ignore messages that are not private encrypted messages.
+    //Ignore messages that are not private encrypted messages.
     if (data.messageType !== "encrypted_message") {
       return;
     }
@@ -508,7 +539,7 @@ function connectPrivateWebSocket() {
       const myUser = await getMyUser();
       const myUserId = myUser.id;
 
-      // Ignore messages that are not addressed to this user.
+      //Ignore messages that are not addressed to this user.
       if (data.recipient_id !== myUserId) {
         return;
       }
@@ -517,20 +548,20 @@ function connectPrivateWebSocket() {
       const peer = await getPeerKeyForConversation(data.conversation_id, data.sender_id);
       const conversationKey = await deriveConversationKey({myPrivateKey, theirPublicKey: peer.publicKey, myUserId: myUserId, theirUserId: data.sender_id});
 
-      // Decrypt and authenticate the message locally.
+      //Decrypt and authenticate the message locally.
       const payload = await open(conversationKey, data.conversation_id,
         {
           ciphertext: data.ciphertext, 
           iv: data.iv
         });
 
-      // The encrypted metadata must match the server envelope.
+      //The encrypted metadata must match the server envelope.
       if (payload.senderId !== data.sender_id || payload.seq !== data.seq) 
         {
           throw new Error("Encrypted message metadata does not match.");
         }
 
-      // Only display it if this conversation is currently open.
+      //Only display it if this conversation is currently open.
       if (data.conversation_id !== activeConversationId) {
         privateChatStatus.textContent = "New encrypted message received in another conversation.";
         return;
@@ -553,14 +584,6 @@ function connectPrivateWebSocket() {
 
       privateChatStatus.textContent = "Received a message that could not be decrypted.";
     }
-  });
-
-  socket.addEventListener("close", () => {
-    console.log("Private message WebSocket disconnected.");
-  });
-
-  socket.addEventListener("error", () => {
-    console.log("Private message WebSocket error.");
   });
 
   return socket;

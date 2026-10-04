@@ -34,6 +34,8 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/api/conversations", conversation_controller, True)
         self.router.add_route("POST", "/api/conversations/", conversation_controller, False)
         self.router.add_route("GET", "/api/conversations/", conversation_controller, False)
+        self.router.add_route("PUT", "/api/conversations/", conversation_controller, False)
+        self.router.add_route("DELETE", "/api/conversations/", conversation_controller, False)
 
         self.router.add_route("GET", "/api/users/@me", auth_controller, True)
         self.router.add_route("GET", "/api/users/search", auth_controller, False)
