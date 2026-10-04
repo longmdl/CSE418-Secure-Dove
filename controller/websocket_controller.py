@@ -15,9 +15,10 @@ def websocket_controller(request, handler):
     
     auth_token = request.cookies.get("auth_token", "")
     payload = verify_jwt(auth_token)
+    user_id = payload.get("sub") if payload else None
     username = payload.get("username") if payload else None
 
-    if not username:
+    if not user_id or not username:
         res.set_status(401, "Unauthorized")
         res.text("Unauthorized")
         handler.request.sendall(res.to_data())
@@ -33,7 +34,7 @@ def websocket_controller(request, handler):
         return
 
     perform_handshake(handler, ws_key)
-    ws_service.register(handler, username)
+    ws_service.register(handler, user_id, username)
     run_receive_loop(handler)
     ws_service.unregister(handler)
 

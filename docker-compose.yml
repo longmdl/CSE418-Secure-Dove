@@ -1,6 +1,10 @@
 services:
   nginx:
     build: ./nginx
+    depends_on:
+    - myapp
+    - auth_server
+    command: /bin/sh -c "sleep 5 && nginx -g 'daemon off;'"
     ports:
     - '80:80'
     - '443:443'
