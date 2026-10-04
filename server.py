@@ -8,6 +8,7 @@ from controller.static_controller import render_controller
 from controller.auth_controller import auth_controller
 from controller.websocket_controller import websocket_controller
 from controller.key_controller import key_controller
+from controller.conversation_controller import conversation_controller
 
 
 class MyTCPHandler(socketserver.BaseRequestHandler):
@@ -28,6 +29,11 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/api/chats", chat_controller, True)
         self.router.add_route("PATCH", "/api/chats", chat_controller, False)
         self.router.add_route("DELETE", "/api/chats", chat_controller, False)
+
+        self.router.add_route("POST", "/api/conversations", conversation_controller, True)
+        self.router.add_route("GET", "/api/conversations", conversation_controller, True)
+        self.router.add_route("POST", "/api/conversations/", conversation_controller, False)
+        self.router.add_route("GET", "/api/conversations/", conversation_controller, False)
 
         self.router.add_route("GET", "/api/users/@me", auth_controller, True)
         self.router.add_route("GET", "/api/users/search", auth_controller, False)

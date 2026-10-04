@@ -43,12 +43,11 @@ def open_conversation(user_id, other_user_id):
     if other_user is None:
         return None, 404
 
-    conversation = open_or_get_conversation_db(
-        user_id,
-        other_user_id
-    )
-
+    conversation = open_or_get_conversation_db(user_id, other_user_id)
     conversation.pop("_id", None)
+
+    if hasattr(conversation.get("created_at"), "isoformat"):
+        conversation["created_at"] = conversation["created_at"].isoformat()
 
     return conversation, 200
 
@@ -142,13 +141,14 @@ def send_message(conversation_id, user_id, data):
         "timestamp": datetime.now(timezone.utc)
     }
 
-    inserted = insert_message_db(message)
+    inserted_id = insert_message_db(message)
 
-    if not inserted:
+    if inserted_id is None:
         # Duplicate (sender_id, seq)
         return None, 409
 
     message.pop("_id", None)
+    message["id"] = str(inserted_id)
 
     return message, 201
 

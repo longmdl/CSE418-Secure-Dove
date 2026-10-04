@@ -24,10 +24,10 @@ message_collection.create_index(
 
 def insert_message_db(message):
     try:
-        message_collection.insert_one(message)
-        return True
+        result = message_collection.insert_one(message)
+        return result.inserted_id
     except DuplicateKeyError:
-        return False
+        return None
 
 
 def get_message_db(sender_id, seq):
