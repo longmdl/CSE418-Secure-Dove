@@ -1,5 +1,6 @@
 from util.auth import extract_credentials, validate_password
 from repository.auth_repository import get_user_profile_db, search_users_db, update_profile_db
+from service.chat_service import update_chat_author
 
 import bcrypt
 
@@ -20,13 +21,15 @@ def get_user_search(query):
         })
     return result
 
-def update_user_profile(old_username, request):
+def update_user_profile(user_id, request):
     user_password_list = extract_credentials(request) #extract new username and password from request
     new_username = user_password_list[0]
     new_password = user_password_list[1]
 
     if new_password == "": #empty password will only update the username
-        result = update_profile_db(old_username, new_username, None, None)
+        result = update_profile_db(user_id, new_username, None, None)
+        if result:
+            update_chat_author(user_id, new_username)
         return result
 
     password_valid = validate_password(new_password) #validate new password
@@ -35,5 +38,7 @@ def update_user_profile(old_username, request):
 
     password_bytes = new_password.encode()
     salt = bcrypt.gensalt() #sprinkle some more salt
-    result = update_profile_db(old_username, new_username, password_bytes, salt)
+    result = update_profile_db(user_id, new_username, password_bytes, salt)
+    if result:
+        update_chat_author(user_id, new_username)
     return result
