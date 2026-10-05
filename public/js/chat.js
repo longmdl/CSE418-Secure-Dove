@@ -1,4 +1,106 @@
-import { html } from "./utils.js";
+function generateMessage(message){ //to generate safe HTML with variables
+      const divOuterFirst = document.createElement("div");
+      divOuterFirst.id=`group-${message.id}`;
+      divOuterFirst.className="py-1";
+      const divMiddleFirst = document.createElement("div");
+      divMiddleFirst.id = `message-${message.id}`;
+      divMiddleFirst.className= "flex items-start gap-2 group"; 
+      const divInnerFirst = document.createElement("div");
+      divInnerFirst.className="flex items-center h-full self-center";
+      const buttonFirst = document.createElement("button");
+      buttonFirst.className="text-xs px-1 py-0.5 rounded bg-gray-600 text-white hover:bg-gray-500";
+      buttonFirst.id="delete-button";
+      buttonFirst.setAttribute("onclick", `deleteMessage('${message.id}')`);
+      buttonFirst.textContent="X";
+
+      const divOuterSecond = document.createElement("div");
+      divOuterSecond.className = "relative flex flex-col h-full justify-center";
+      const paraSecond = document.createElement("p");
+      const divInnerSecond = document.createElement("div");
+      divInnerSecond.id=message.id;
+      divInnerSecond.className="cursor-pointer message-content";
+      const spanFirst=document.createElement("span");
+      spanFirst.className="italic font-black";
+      spanFirst.textContent=`${message.author} :`; 
+      const spanSecond = document.createElement("span");
+      spanSecond.className="whitespace-pre-wrap";
+      spanSecond.textContent=message.content;
+      const spanThird = document.createElement("span");
+      spanThird.className="text-xs";
+      spanThird.textContent = message.updated ? "(edited)" : "";
+      const buttonSecond=document.createElement("button");
+      buttonSecond.className="absolute top-0 -right-6 p-1 hover:bg-gray-200/50 rounded-full";
+      buttonSecond.setAttribute("onclick", `editMessage('${message.id}')`);
+      const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+      svg.setAttribute("width", "14");
+      svg.setAttribute("height", "14"); 
+      svg.setAttribute("viewBox", "0 0 24 24");
+      svg.setAttribute("fill", "none");
+      svg.setAttribute("stroke", "currentColor"); 
+      svg.setAttribute("stroke-width", "2"); 
+      svg.setAttribute("stroke-linecap", "round");
+      svg.setAttribute("stroke-linejoin", "round");
+      svg.setAttribute("class", "text-gray-600");
+      const pathFirst = document.createElementNS("http://www.w3.org/2000/svg","path"); 
+      pathFirst.setAttribute("d", "M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z");
+      const pathSecond = document.createElementNS("http://www.w3.org/2000/svg","path");
+      pathSecond.setAttribute("d", "m15 5 4 4");
+
+      const divOuterThird=document.createElement("div");
+      divOuterThird.className = "hidden flex items-start gap-2 mb-2"; 
+      divOuterThird.id = `edit-form-${message.id}`;
+      const formFirst = document.createElement("form");
+      formFirst.className = "w-full"; 
+      formFirst.setAttribute("onsubmit",`event.preventDefault(); submitEdit('${message.id}')`);
+      const divMiddleThird=document.createElement("div"); 
+      divMiddleThird.className="flex gap-2 items-center";
+      const spanFourth = document.createElement("span");
+      spanFourth.className="text-sm";
+      spanFourth.textContent=`${message.author}:`;
+      const inputFirst=document.createElement("input");
+      inputFirst.type="text";
+      inputFirst.className= "flex-1 px-2 py-1 border rounded";
+      inputFirst.value = message.content; 
+      inputFirst.id = `edit-input-${message.id}`; 
+      const divInnerThird = document.createElement("div");
+      divInnerThird.className="flex gap-2 mt-2 justify-start";
+      const buttonThird=document.createElement("button");
+      buttonThird.type = "button"; 
+      buttonThird.className = "px-2 py-1 text-sm rounded bg-gray-700 hover:bg-gray-300"; 
+      buttonThird.textContent = "Cancel";
+      buttonThird.setAttribute("onclick", `cancelEdit('${message.id}');`);
+      const buttonFourth=document.createElement("button");
+      buttonFourth.type = "button"; 
+      buttonFourth.className = "px-2 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"; 
+      buttonFourth.textContent = "Save";
+      buttonFourth.type="submit";
+      
+      divInnerFirst.appendChild(buttonFirst);
+      divInnerSecond.appendChild(spanFirst);
+      divInnerSecond.appendChild(spanSecond);
+      divInnerSecond.appendChild(spanThird);
+      svg.appendChild(pathFirst);
+      svg.appendChild(pathSecond);
+      buttonSecond.appendChild(svg);
+      paraSecond.appendChild(divInnerSecond);
+      paraSecond.appendChild(buttonSecond);
+      divOuterSecond.appendChild(paraSecond);
+
+      divMiddleFirst.appendChild(divInnerFirst);
+      divMiddleFirst.appendChild(divOuterSecond);
+      divMiddleThird.appendChild(spanFourth);
+      divMiddleThird.appendChild(inputFirst);
+      divInnerThird.appendChild(buttonThird);
+      divInnerThird.appendChild(buttonFourth);
+
+      formFirst.appendChild(divMiddleThird);
+      formFirst.appendChild(divInnerThird);
+      divOuterThird.appendChild(formFirst);
+      divOuterFirst.appendChild(divMiddleFirst);
+      divOuterFirst.appendChild(divOuterThird);
+
+      return divOuterFirst;
+    }
 
 async function fetchMessages() {
   const newMessages = await fetch("/api/chats").then((res) => res.json());
@@ -6,98 +108,14 @@ async function fetchMessages() {
     if (message.id === isEditing) {
       return;
     }
-    const messageHtml = html`
-      <div id="group-${message.id}" class="py-1">
-        <div id="message-${message.id}" class="flex items-start gap-2 group">
-          <div class="flex items-center h-full self-center">
-            <button
-            class="text-xs px-1 py-0.5 rounded bg-gray-600 text-white hover:bg-gray-500"
-            id="delete-button"
-            onclick="deleteMessage('${message.id}')"
-            >
-            X
-            </button>
-          </div>
-          <div class="relative flex flex-col h-full justify-center">
-            <p>
-              <div class="cursor-pointer message-content" id="${message.id}">
-                <span class="italic font-black">${message.author} :</span>
-                <span 
-                  >${message.content}</span
-                >
-                <span class="text-xs">${message.updated ? "(edited)" : ""
-      } </span>
-              </div>
-              <button
-                class="absolute top-0 -right-6 p-1 hover:bg-gray-200/50 rounded-full"
-                onclick="editMessage('${message.id}')"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="14"
-                  height="14"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  class="text-gray-600"
-                >
-                  <path
-                    d="M21.174 6.812a1 1 0 0 0-3.986-3.987L3.842 16.174a2 2 0 0 0-.5.83l-1.321 4.352a.5.5 0 0 0 .623.622l4.353-1.32a2 2 0 0 0 .83-.497z"
-                  />
-                  <path d="m15 5 4 4" />
-                </svg>
-              </button>
-            </p>
-          </div>
-        </div>
-
-        <div
-          class="hidden flex items-start gap-2 mb-2"
-          id="edit-form-${message.id}"
-        >
-          <form
-            class="w-full"
-            onsubmit="event.preventDefault(); submitEdit('${message.id}')"
-          >
-            <div class="flex gap-2 items-center">
-              <span class="text-sm">${message.author}:</span>
-              <input
-                type="text"
-                class="flex-1 px-2 py-1 border rounded"
-                value="${message.content}"
-                id="edit-input-${message.id}"
-              />
-            </div>
-            <div class="flex gap-2 mt-2 justify-start">
-              <button
-                type="button"
-                class="px-2 py-1 text-sm rounded bg-gray-700 hover:bg-gray-300"
-                onclick="cancelEdit('${message.id}')"
-              >
-                Cancel
-              </button>
-              <button
-                class="px-2 py-1 text-sm rounded bg-blue-500 text-white hover:bg-blue-600"
-                type="submit"
-              >
-                Save
-              </button>
-            </div>
-          </form>
-        </div>
-      </div>
-    `;
+    //update message
+    const messageSection=generateMessage(message);
     const groupRef = document.getElementById(`group-${message.id}`);
     if (groupRef === null) {
-      document
-        .getElementById("messages")
-        .insertAdjacentHTML("beforeend", messageHtml);
+      document.getElementById("messages").appendChild(messageSection);
       return;
     }
-    groupRef.outerHTML = messageHtml;
+    groupRef.replaceWith(messageSection);
   });
 
   // Remove deleted messages
@@ -114,7 +132,6 @@ async function fetchMessages() {
       }
     }
   });
-
 }
 
 fetchMessages();

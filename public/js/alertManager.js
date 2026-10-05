@@ -65,20 +65,46 @@ class AlertManager {
     const alert = document.createElement("div");
     // start hidden to allow fade in
     alert.className = `opacity-0 transition-all duration-300 transform translate-y-[-1rem] w-full p-4 bg-primary border-2 rounded-lg shadow-lg flex flex-col gap-2 ${colorClasses[type]} `;
-    alert.id = id;
+      alert.id = id;
 
-    alert.innerHTML = `
-    <div class="flex justify-between items-center mb-2">
-        <div class="flex items-center gap-3">
-            <i data-lucide="${this.getIconForType(type)}" class="w-6 h-6"></i>
-            <h3 class="font-semibold text-xl">${title}</h3>
-        </div>
-        <button class="text-gray-400 hover:text-white" onclick="alertManager.removeAlert('${id}')">
-            <i data-lucide="x" class="w-5 h-5"></i>
-        </button>
-        </div>
-    <p class="text-white leading-relaxed">${message}</p>
-    `;
+      //begin editing the contents to incorporate DOM for more security
+      
+      const divOuter = document.createElement("div");
+      divOuter.className="flex justify-between items-center mb-2";
+
+      const divInner = document.createElement("div");
+      divInner.className="flex items-center gap-3";
+
+      const icon = document.createElement("i");
+      icon.setAttribute("data-lucide", this.getIconForType(type));
+      icon.setAttribute("class", "w-6 h-6");
+
+      const header3 = document.createElement("h3");
+      header3.className="font-semibold text-xl";
+      header3.textContent = title;
+
+      const button = document.createElement("button");
+      button.className="text-gray-400 hover:text-white";
+      button.setAttribute("onclick", `alertManager.removeAlert('${id}')`);
+
+      const xIcon = document.createElement("i");
+      xIcon.setAttribute("data-lucide", "x");
+      xIcon.className="w-5 h-5";
+
+      const para = document.createElement("p");
+      para.className="text-white leading-relaxed";
+      para.textContent=message;
+
+      button.appendChild(xIcon); //build individual elements to preserve HTML structure 
+      divInner.appendChild(icon);
+      divInner.appendChild(header3);
+      
+      divOuter.appendChild(divInner);
+      divOuter.appendChild(button);
+      
+      alert.appendChild(divOuter);
+      alert.appendChild(para); 
+      
 
     // Let element render first, then remove opacity
     setTimeout(() => {
