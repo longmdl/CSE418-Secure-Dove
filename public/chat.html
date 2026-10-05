@@ -24,4 +24,111 @@
   </form>
 </div>
 
+<div class="mt-8 border-t border-gray-600 pt-4">
+  <h2 class="text-xl font-semibold mb-4">Private Encrypted Chat</h2>
+
+  <div class="flex items-center gap-2 mb-4">
+    <input
+      id="private-user-id"
+      class="w-full px-3 py-1 rounded-md text-black"
+      type="text"
+      placeholder="User ID"
+    />
+
+    <button
+      id="open-private-chat"
+      type="button"
+      class="bg-gray-700 rounded-xl px-4 py-2 active:bg-gray-500"
+    >
+      Open Chat
+    </button>
+  </div>
+
+  <div id="private-chat-status" class="mb-2"></div>
+
+  <div
+    id="private-messages"
+    class="h-[40vh] overflow-y-auto w-full"
+  ></div>
+
+  <form
+    id="private-message-form"
+    class="flex items-center gap-4 w-full mt-4"
+  >
+    <input
+      id="private-message"
+      class="w-full px-3 py-1 rounded-md text-black"
+      type="text"
+      placeholder="Type an encrypted message"
+    />
+
+    <button
+      type="submit"
+      class="bg-gray-700 rounded-xl px-4 py-2 active:bg-gray-500"
+    >
+      Send
+    </button>
+  </form>
+</div>
+
+<div class="mt-6 border-t border-gray-600 pt-4">
+  <h2 class="text-lg font-semibold mb-2">Key verification</h2>
+
+  <div id="my-fingerprint" class="mb-4"></div>
+
+  <div class="flex items-center gap-2 mb-2">
+    <input
+      id="verify-user-id"
+      class="px-3 py-1 rounded-md text-black"
+      type="text"
+      placeholder="Contact's user id"
+    />
+    <button
+      id="verify-button"
+      type="button"
+      class="bg-gray-700 rounded-xl px-4 py-2 active:bg-gray-500"
+    >
+      Show fingerprint
+    </button>
+  </div>
+  <div id="contact-fingerprint"></div>
+</div>
+
+<script type="module">
+  // SD-03: this browser needs a device key before it can take part in a
+  // conversation. Idempotent, so running it on every load is fine.
+  import { ensureEnrolledOrExplain } from "/public/js/enroll.js";
+  ensureEnrolledOrExplain();
+</script>
+
 <script src="/public/js/chat.js" type="module"></script>
+
+<script type="module">
+  // shows your own fingerprint right away, and lets you type in someone
+  // else's user id to see their fingerprint too
+  import { renderMyFingerprint, renderContactFingerprint } from "/public/js/contact-verifier.js";
+
+  async function getMyUserId() {
+    const response = await fetch("/api/users/@me");
+    if (!response.ok) return null;
+    const me = await response.json();
+    return me && typeof me.id === "string" ? me.id : null;
+  }
+  const myBox = document.getElementById("my-fingerprint");
+  const contactBox = document.getElementById("contact-fingerprint");
+  const userIdInput = document.getElementById("verify-user-id");
+  const showButton = document.getElementById("verify-button");
+  const myUserId = await getMyUserId();
+  if (myUserId) {
+    await renderMyFingerprint(myBox, myUserId);
+  } else {
+    myBox.textContent = "Sign in to see your fingerprint.";
+  }
+  showButton.addEventListener("click", async () => {
+    const contactId = userIdInput.value.trim();
+    if (!contactId) return;
+    await renderContactFingerprint(contactBox, contactId);
+  });
+</script>
+
+<script src="/public/js/chat-client.js" type="module"></script>

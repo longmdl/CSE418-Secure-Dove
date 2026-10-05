@@ -2,12 +2,12 @@ import json
 import uuid
 from util.websockets import generate_ws_frame
 
-connected_users = {} #handler -> username
+connected_users = {} #handler -> {"user_id": ..., "username": ...}
 connection_ids = {} #handler -> uuid (socket_id)
 
 
-def register(handler, username):
-    connected_users[handler] = username
+def register(handler,user_id, username):
+    connected_users[handler] = {"user_id": user_id, "username": username}
     connection_ids[handler] = str(uuid.uuid4())
     broadcast_user_list()
 
@@ -28,8 +28,18 @@ def handle_message(handler, message_data):
 
 
 def broadcast_user_list():
-    users = [{"username": u} for u in connected_users.values()]
+    users = [
+        {"username": user["username"]}
+        for user in connected_users.values()
+    ]
     broadcast({"messageType": "active_users_list", "users": users})
+
+def send_to_user(user_id, message_dict):
+    frame = generate_ws_frame(json.dumps(message_dict).encode())
+
+    for handler, user in list(connected_users.items()):
+        if user["user_id"] == user_id:
+            send_raw(handler, frame)
 
 
 def broadcast(message_dict):

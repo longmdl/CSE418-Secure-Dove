@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>keystore tests (SD-03)</title>
+<style>
+  body { font-family: system-ui, sans-serif; max-width: 52rem; margin: 2rem auto; padding: 0 1rem; line-height: 1.45; }
+  h1 { font-size: 1.3rem; }
+  h2 { font-size: 1.05rem; margin-top: 2rem; }
+  .pass { color: #0a7a2f; }
+  .fail { color: #b00020; font-weight: 600; }
+  li { margin: 0.15rem 0; }
+  button { margin: 0.4rem 0.4rem 0.4rem 0; padding: 0.35rem 0.8rem; }
+  code { background: #f4f4f4; padding: 0 0.2rem; }
+  .note { color: #555; font-size: 0.9rem; }
+  #summary, #persist-summary { font-weight: 600; margin: 0.5rem 0; }
+</style>
+</head>
+<body>
+<h1>keystore.js tests (SD-03)</h1>
+<p class="note">
+  Open this through the running app so the session cookie and the API are in play:<br>
+  <code>docker compose up --build</code>, then
+  <code>https://localhost/public/../tests/keys/browser-test.html</code> will not work &mdash;
+  instead serve the repo root over localhost:
+  <code>python3 -m http.server 9000</code> and open
+  <code>http://localhost:9000/tests/keys/browser-test.html</code>.
+  The directory round trip needs the app, so log in at <code>https://localhost</code> first and run
+  section 3 from a tab on that origin.
+</p>
+
+<h2>1. IndexedDB unit tests</h2>
+<div id="summary">Running...</div>
+<ul id="results"></ul>
+
+<h2>2. Persistence across reload</h2>
+<p class="note">Reload this page. The device id and fingerprint below must not change.</p>
+<div id="persist-summary">Reading...</div>
+<button id="wipe">Wipe device key (simulates logout)</button>
+
+<h2>3. Directory round trip <span class="note">(run on the app's origin, logged in)</span></h2>
+<button id="enrol">Publish my key, then fetch it back</button>
+<ul id="directory"></ul>
+
+<script type="module">
+import {
+  getOrCreateDeviceKey, getDeviceId, exportPublicJwk, hasDeviceKey, clearDeviceKey,
+} from "/public/js/keystore.js";
+import { publishMyKey, fetchPeerKey, fingerprintOf, formatFingerprint } from "/public/js/key-api.js";
+
+// the unit tests use throwaway ids so they never touch a real account's record
+const USER_A = "test-user-a";
+const USER_B = "test-user-b";
+
+const results = document.getElementById("results");
+const add = (ok, name, detail = "") => {
+  const li = document.createElement("li");
+  li.className = ok ? "pass" : "fail";
+  li.textContent = (ok ? "PASS  " : "FAIL  ") + name + (detail ? " -> " + detail : "");
+  results.appendChild(li);
+  return ok;
+};
+
+const tests = [
+  ["a key exists after the first call", async () => {
+    const { keyPair, deviceId } = await getOrCreateDeviceKey(USER_A);
+    if (!keyPair?.privateKey) throw new Error("no private key");
+    if (!deviceId) throw new Error("no device id");
+    if (!(await hasDeviceKey(USER_A))) throw new Error("hasDeviceKey() says no");
+  }],
+  ["two accounts on one browser get different keys", async () => {
+    const a = await getOrCreateDeviceKey(USER_A);
+    const b = await getOrCreateDeviceKey(USER_B);
+    if (a.deviceId === b.deviceId) throw new Error("both accounts share a device id");
+    const fa = await fingerprintOf(await exportPublicJwk(USER_A));
+    const fb = await fingerprintOf(await exportPublicJwk(USER_B));
+    if (fa === fb) throw new Error("both accounts share a public key");
+  }],
+  ["an account with no record here reports no key", async () => {
+    if (await hasDeviceKey("test-user-never-enrolled")) throw new Error("claims a key it never made");
+  }],
+  ["the private key survives IndexedDB still non-extractable", async () => {
+    const { keyPair } = await getOrCreateDeviceKey(USER_A);
+    if (keyPair.privateKey.extractable !== false) throw new Error("extractable is true");
+    let exported = true;
+    try { await crypto.subtle.exportKey("jwk", keyPair.privateKey); } catch { exported = false; }
+    if (exported) throw new Error("exportKey succeeded on the stored private key");
+  }],
+  ["calling it twice returns the same key, never a new one", async () => {
+    const a = await getOrCreateDeviceKey(USER_A);
+    const b = await getOrCreateDeviceKey(USER_A);
+    if (a.deviceId !== b.deviceId) throw new Error("device id changed between calls");
+    const fa = await fingerprintOf(await exportPublicJwk(USER_A));
+    const fb = await fingerprintOf(await exportPublicJwk(USER_A));
+    if (fa !== fb) throw new Error("public key changed between calls");
+  }],
+  ["the exported JWK carries no private component", async () => {
+    const jwk = await exportPublicJwk(USER_A);
+    if ("d" in jwk) throw new Error("d present in exported JWK");
+    if (jwk.kty !== "EC" || jwk.crv !== "P-256") throw new Error("wrong key type");
+  }],
+];
+
+let passed = 0;
+for (const [name, fn] of tests) {
+  try { await fn(); passed += add(true, name) ? 1 : 0; }
+  catch (e) { add(false, name, e.message); }
+}
+document.getElementById("summary").textContent = `${passed} passed, ${tests.length - passed} failed`;
+
+async function showPersisted() {
+  const el = document.getElementById("persist-summary");
+  if (!(await hasDeviceKey(USER_A))) { el.textContent = "no device key stored for the test account"; return; }
+  const fingerprint = await fingerprintOf(await exportPublicJwk(USER_A));
+  el.textContent = `account ${USER_A} | device ${await getDeviceId(USER_A)} | fingerprint ${formatFingerprint(fingerprint)}`;
+}
+await showPersisted();
+
+document.getElementById("wipe").onclick = async () => {
+  await clearDeviceKey(USER_A);
+  await showPersisted();
+};
+
+document.getElementById("enrol").onclick = async () => {
+  const out = document.getElementById("directory");
+  out.innerHTML = "";
+  try {
+    const me = await (await fetch("/api/users/@me")).json();
+    const published = await publishMyKey(me.id);
+    add2(true, `published: ${published.outcome}, fingerprint ${formatFingerprint(published.fingerprint)}`);
+    const peer = await fetchPeerKey(me.id);
+    const mine = await fingerprintOf(await exportPublicJwk(me.id));
+    add2(peer.fingerprint === mine, `fetched back and fingerprints match: ${peer.fingerprint === mine}`);
+    add2(peer.publicKey.type === "public", `imported as a CryptoKey: ${peer.publicKey.type}`);
+  } catch (e) {
+    add2(false, e.message);
+  }
+  function add2(ok, text) {
+    const li = document.createElement("li");
+    li.className = ok ? "pass" : "fail";
+    li.textContent = (ok ? "PASS  " : "FAIL  ") + text;
+    out.appendChild(li);
+  }
+};
+</script>
+</body>
+</html>
