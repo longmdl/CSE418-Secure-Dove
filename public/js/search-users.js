@@ -4,17 +4,16 @@ async function searchUsers() {
     const users = await response.json();
 
     const usersList = document.getElementById('user-list');
-    usersList.textContent = ''; // replaced innerHTML with textContent for safer rendering 
+    usersList.textContent = ''; // replaced  with textContent for safer rendering 
     if (users.users.length) {
-	users.users.map(user => {
-        //start of compound statement
-        const div = document.createElement('div');
-        div.className = "p-4 bg-gray-700 rounded-md";
-        const p = document.createElement('p');
+	users.users.map(user => { //start of compound statement
+	    const div = document.createElement('div');
+	    div.className = "p-4 bg-gray-700 rounded-md";
+	    const p = document.createElement('p');
 	    p.className="text-white";
-        p.textContent=user.username;
+	    p.textContent=user.username;
 	    div.appendChild(p);
-            usersList.appendChild(div)
+	    usersList.appendChild(div)
 	}
 		       )
     }

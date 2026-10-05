@@ -67,7 +67,7 @@ class AlertManager {
     alert.className = `opacity-0 transition-all duration-300 transform translate-y-[-1rem] w-full p-4 bg-primary border-2 rounded-lg shadow-lg flex flex-col gap-2 ${colorClasses[type]} `;
       alert.id = id;
 
-      //begin editing the innerHTML contents to incorporate DOM for more security
+      //begin editing the contents to incorporate DOM for more security
       
       const divOuter = document.createElement("div");
       divOuter.className="flex justify-between items-center mb-2";

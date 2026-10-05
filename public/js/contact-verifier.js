@@ -61,7 +61,7 @@ function note(text) {
 
 // shows your own fingerprint in the given container
 export async function renderMyFingerprint(container, userId) {
-  container.innerHTML = "";
+  container.textContent= ""; //changed for security 
   try {
     const formatted = await myFingerprint(userId);
     container.appendChild(row("Your fingerprint", formatted));
@@ -73,7 +73,7 @@ export async function renderMyFingerprint(container, userId) {
 // shows a contact's fingerprint,plus a short instruction telling the user
 // to double check it with that person
 export async function renderContactFingerprint(container, contactUserId) {
-  container.innerHTML = "";
+  container.textContent = ""; //changed for security 
   try {
     const result = await contactFingerprint(contactUserId);
     container.appendChild(row("Contact's fingerprint", result.fingerprint));
