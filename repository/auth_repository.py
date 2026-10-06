@@ -42,7 +42,7 @@ def get_username_by_id_db(user_id):
 def search_users_db(search):
     if len (search) > 32: #to prohibit searches len >= 33
         return None
-    users = user_collection.find({"username": {"$regex": "^" + re.escape(search)}}) #case sensitive search
+    users = user_collection.find({"username": {"$regex": "^" + re.escape(search)}}).limit(20) #case sensitive search
     return users
 
 def update_profile_db(user_id, new_username, password_bytes, salt):
