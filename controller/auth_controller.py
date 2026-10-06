@@ -33,6 +33,13 @@ def auth_controller(request, handler):
         return
 
     if method == "GET" and path.startswith("/api/users/search"):
+        payload = verify_jwt(cookies.get("auth_token", ""))
+        if not payload: #search is for logged in users only
+            res.set_status(401, "Unauthorized")
+            res.json({"users": []})
+            handler.request.sendall(res.to_data())
+            return
+        
         query = ""
         if "?" in request.path: #check if theres ? in request path
             query_list = request.path.split("?", 1)
