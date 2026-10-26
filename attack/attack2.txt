@@ -1,0 +1,11 @@
+Attack 2:  Unauthenticated Access to Backend Map Data
+The API endpoint lacks proper authentication and authorization checks (specifically, it does not verify the user ID or login state).
+
+1. Open an incognito browser tab without logging into the application.
+2. Open the browser's Developer Tools (DevTools) and navigate to the Console.
+3. Run the following fetch command:
+    a. fetch("https://cattle.cse.buffalo.edu/CSE442/2026-Spring/cse-442c/backend/public/api/homepageMapPoints.php")
+        .then(r => r.json())
+        .then(console.log)
+
+Result: The server successfully returns the complete dataset of map points and sensitive outbreak details without requiring an active user session or authentication token.

