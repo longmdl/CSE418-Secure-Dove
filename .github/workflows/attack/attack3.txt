@@ -1,0 +1,9 @@
+Attack 3: Unauthenticated Outbreak Database Export 
+The API file “exportoutbreaks.php” does not check user authentication when exporting data from the database allowing you to download the entire outbreaks table without being logged in. 
+
+1. Open an incognito browser tab without logging in to the application. Ensure you are on UB-wifi or using the UB VPN
+2. Press F12 and go to network.
+3. Open this link http://cattle.cse.buffalo.edu/CSE442/2026-Spring/cse-442c/backend/public/api/exportOutbreaks.php 
+4. Check the response of the 200 GET request and see the outbreaks table displayed as a CSV and have the CSV downloaded to your device.
+
+Result: A CSV file should be downloaded that contains all of the outbreak information in the database. This bypasses the Confidentiality security goal of: Reports only being viewable by a logged in user.
