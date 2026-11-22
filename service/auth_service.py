@@ -1,5 +1,5 @@
 from util.auth import extract_credentials, validate_password
-from repository.auth_repository import get_user_profile_db, search_users_db, update_profile_db, get_user_by_id_db
+from repository.auth_repository import get_user_profile_db, search_users_db, update_profile_db, get_user_by_id_db, confirm_pending_totp_db
 from repository.login_failure_repository import is_locked_out_db, record_failed_login_db, reset_failed_logins_db
 from service.chat_service import update_chat_author
 
@@ -11,6 +11,7 @@ TOTP_OK = "ok"
 TOTP_MISSING = "missing"
 TOTP_INVALID = "invalid"
 TOTP_LOCKED = "locked"
+TOTP_NO_PENDING = "no_pending" #confirm_new_totp only: there's no new secret waiting
 
 
 def check_current_totp(user_id, totp_code):
@@ -36,6 +37,33 @@ def check_current_totp(user_id, totp_code):
         record_failed_login_db(username)
         return TOTP_INVALID
 
+    reset_failed_logins_db(username)
+    return TOTP_OK
+
+
+def confirm_new_totp(user_id, totp_code):
+    #second half of regenerating 2FA: the new secret only replaces the old one once the
+    #user enters a code from it, so nobody gets locked out by a QR code they never saved.
+    #wrong codes count toward the same lockout as check_current_totp
+    user = get_user_by_id_db(user_id)
+    if not user:
+        return TOTP_INVALID
+
+    pending_secret = user.get("pending_totp_secret")
+    if not pending_secret:
+        return TOTP_NO_PENDING
+
+    username = user.get("username")
+    if is_locked_out_db(username):
+        return TOTP_LOCKED
+    if not totp_code:
+        return TOTP_MISSING
+    if not pyotp.TOTP(pending_secret).verify(totp_code):
+        record_failed_login_db(username)
+        return TOTP_INVALID
+
+    if not confirm_pending_totp_db(user_id, pending_secret): #regenerated again meanwhile, that newer secret needs its own code
+        return TOTP_INVALID
     reset_failed_logins_db(username)
     return TOTP_OK
 

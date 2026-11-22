@@ -6,9 +6,19 @@ import pyotp
 import re 
 
 def enable_otp_db(user_id):
+    #the new secret waits in pending_totp_secret until the user proves they saved it
+    #(confirm_pending_totp_db). until then login keeps using the old totp_secret, or none
     totp_secret = pyotp.random_base32()
-    user_collection.update_one({"id": user_id}, {"$set": {"totp_secret": totp_secret}})
+    user_collection.update_one({"id": user_id}, {"$set": {"pending_totp_secret": totp_secret}})
     return totp_secret
+
+def confirm_pending_totp_db(user_id, pending_secret):
+    #matching on the secret that was checked means a regenerate in between (a newer
+    #pending secret) can't be switched on by a code from the older one
+    result = user_collection.update_one(
+        {"id": user_id, "pending_totp_secret": pending_secret},
+        {"$set": {"totp_secret": pending_secret}, "$unset": {"pending_totp_secret": ""}})
+    return result.modified_count == 1
 
 def get_user_by_id_db(user_id):
     return user_collection.find_one({"id": user_id})
