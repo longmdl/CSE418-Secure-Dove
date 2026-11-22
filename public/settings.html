@@ -60,7 +60,9 @@
             <p class="text-sm text-gray-500 pr-2">
               Add an extra layer of security to your account. By clicking the
               button, this will regenerate your 2FA secret and QR code. Even if
-              you already have one set.
+              you already have one set. If 2FA is already on, you'll need your
+              current code first. The new one only replaces it after you
+              confirm a code from it.
             </p>
           </div>
         </div>
@@ -74,65 +76,6 @@
       </div>
     </div>
 
-    <!-- 2FA Dialog -->
-    <div
-      id="twoFactorDialog"
-      class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
-    >
-      <div
-        class="w-full max-w-2xl border border-gray-300 rounded-lg p-6 shadow-lg bg-primary"
-      >
-        <h1 class="text-2xl font-bold mb-6 text-white">
-          Enable Two-Factor Authentication
-        </h1>
-        <div class="space-y-6">
-          <div>
-            <label class="block text-sm font-medium mb-2 text-white"
-              >QR Code</label
-            >
-            <div class="flex justify-center">
-              <img
-                id="qrCode"
-                alt="2FA QR Code"
-                class="w-48 h-48 border border-gray-300 rounded-lg"
-              />
-            </div>
-            <p class="mt-2 text-sm text-gray-400">
-              Scan this QR code with your authenticator app to enable 2FA
-            </p>
-          </div>
-
-          <div>
-            <label class="block text-sm font-medium mb-2 text-white"
-              >Manual Entry Code</label
-            >
-            <div
-              class="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-primary"
-            >
-              <code id="secretCode" class="break-all text-white"></code>
-            </div>
-          </div>
-
-          <div class="flex justify-end gap-4">
-            <button
-              type="button"
-              id="closeDialog"
-              class="px-4 py-2 border border-gray-300 rounded-lg text-white hover:bg-gray-800 text-sm font-medium"
-            >
-              Cancel
-            </button>
-            <button
-              type="button"
-              id="doneButton"
-              class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
-            >
-              Done
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-
     <button
       type="submit"
       class="w-full bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700"
@@ -140,11 +83,147 @@
       Save Changes
     </button>
   </form>
+
+  <!-- 2FA Dialog. The new secret only takes effect once a code from it is
+       confirmed. It sits outside the profile form so pressing Enter in the
+       code box confirms 2FA instead of submitting the profile. -->
+  <div
+    id="twoFactorDialog"
+    class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center"
+  >
+    <form
+      id="twoFactorConfirmForm"
+      class="w-full max-w-2xl border border-gray-300 rounded-lg p-6 shadow-lg bg-primary"
+    >
+      <h1 class="text-2xl font-bold mb-6 text-white">
+        Enable Two-Factor Authentication
+      </h1>
+      <div class="space-y-6">
+        <div>
+          <label class="block text-sm font-medium mb-2 text-white"
+            >QR Code</label
+          >
+          <div class="flex justify-center">
+            <img
+              id="qrCode"
+              alt="2FA QR Code"
+              class="w-48 h-48 border border-gray-300 rounded-lg"
+            />
+          </div>
+          <p class="mt-2 text-sm text-gray-400">
+            Scan this QR code with your authenticator app to enable 2FA
+          </p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium mb-2 text-white"
+            >Manual Entry Code</label
+          >
+          <div
+            class="border border-gray-300 rounded-lg px-4 py-2 text-sm bg-primary"
+          >
+            <code id="secretCode" class="break-all text-white"></code>
+          </div>
+        </div>
+
+        <div>
+          <label
+            for="newTotpInput"
+            class="block text-sm font-medium mb-2 text-white"
+          >
+            Confirm New Code
+          </label>
+          <input
+            type="text"
+            id="newTotpInput"
+            placeholder="Enter 6-digit code"
+            inputmode="numeric"
+            autocomplete="one-time-code"
+            maxlength="7"
+            class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+          />
+          <p class="mt-2 text-sm text-gray-400">
+            Enter the code your authenticator app shows for this new entry. Your
+            2FA doesn't change until you confirm.
+          </p>
+          <p id="newTotpError" class="hidden mt-2 text-sm text-red-500"></p>
+        </div>
+
+        <div class="flex justify-end gap-4">
+          <button
+            type="button"
+            id="closeDialog"
+            class="px-4 py-2 border border-gray-300 rounded-lg text-white hover:bg-gray-800 text-sm font-medium"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            id="confirmNewTotp"
+            class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </form>
+  </div>
+
+  <!-- Current 2FA code prompt for sensitive actions. It sits outside the
+       profile form so pressing Enter here never submits the profile. -->
+  <div
+    id="totpPromptDialog"
+    class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-40"
+  >
+    <form
+      id="totpPromptForm"
+      class="w-full max-w-md border border-gray-300 rounded-lg p-6 shadow-lg bg-primary space-y-6"
+    >
+      <h1 class="text-2xl font-bold text-white">Confirm It's You</h1>
+      <p id="totpPromptReason" class="text-sm text-gray-400"></p>
+      <div>
+        <label
+          for="totpPromptInput"
+          class="block text-sm font-medium mb-2 text-white"
+        >
+          Current Authentication Code
+        </label>
+        <input
+          type="text"
+          id="totpPromptInput"
+          placeholder="Enter 6-digit code"
+          inputmode="numeric"
+          autocomplete="one-time-code"
+          maxlength="7"
+          class="w-full border border-gray-300 rounded-lg px-4 py-2 text-sm"
+        />
+        <p id="totpPromptError" class="hidden mt-2 text-sm text-red-500">
+          Enter the 6-digit code from your authenticator app.
+        </p>
+      </div>
+      <div class="flex justify-end gap-4">
+        <button
+          type="button"
+          id="totpPromptCancel"
+          class="px-4 py-2 border border-gray-300 rounded-lg text-white hover:bg-gray-800 text-sm font-medium"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          class="bg-blue-600 text-white font-medium px-4 py-2 rounded-lg hover:bg-blue-700 text-sm"
+        >
+          Continue
+        </button>
+      </div>
+    </form>
+  </div>
 </div>
 
 <!-- Add Lucide Icons -->
 <script src="https://unpkg.com/lucide@latest"></script>
 
+<script src="/public/js/vendor/qrcode.js"></script>
 <script src="/public/js/settings.js"></script>
 
 <script>

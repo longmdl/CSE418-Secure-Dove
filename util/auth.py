@@ -67,6 +67,14 @@ def extract_credentials(request):
         result.append(totp_code)
     return result
 
+def extract_totp_code(request):
+    #pulls totp=... out of a form encoded body. codes are digits only, so no url decoding is needed
+    for part in request.body.decode(errors="replace").split('&'):
+        key, _, value = part.partition('=')
+        if key == "totp":
+            return value.strip() or None
+    return None
+
 def validate_password(password):
     if len(password) < 8:
         return False
