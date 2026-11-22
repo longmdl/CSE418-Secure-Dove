@@ -5,10 +5,13 @@ import bcrypt
 import pyotp
 import re 
 
-def enable_otp_db(username):
+def enable_otp_db(user_id):
     totp_secret = pyotp.random_base32()
-    user_collection.update_one({"username": username}, {"$set": {"totp_secret": totp_secret}})
+    user_collection.update_one({"id": user_id}, {"$set": {"totp_secret": totp_secret}})
     return totp_secret
+
+def get_user_by_id_db(user_id):
+    return user_collection.find_one({"id": user_id})
 
 def register_user_db(user_id, username, password_bytes, salt):
     user_exist = user_collection.find_one({"username": username})
@@ -30,7 +33,8 @@ def get_user_profile_db(username):
     })
     if user: #if @me profile is found, return the username and id
         return {"username": user.get("username"),
-                "id": user.get("id")}
+                "id": user.get("id"),
+                "totp_enabled": bool(user.get("totp_secret"))} #so settings knows to ask for the current code
     return None
 
 def get_username_by_id_db(user_id):

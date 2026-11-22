@@ -1,7 +1,20 @@
 from util.response import Response
-from service.auth_service import get_user_profile, get_user_search, update_user_profile
+from service.auth_service import get_user_profile, get_user_search, update_user_profile, check_current_totp, TOTP_OK, TOTP_MISSING, TOTP_LOCKED
 from repository.auth_repository import enable_otp_db
-from util.auth import verify_jwt
+from util.auth import verify_jwt, extract_credentials, extract_totp_code
+
+
+def send_totp_failure(res, handler, result):
+    if result == TOTP_LOCKED: #same generic 429 as nginx and the login lockout
+        res.set_status(429, "Too Many Requests")
+        res.text("too many requests, try again later")
+    elif result == TOTP_MISSING:
+        res.set_status(403, "Forbidden")
+        res.text("2FA code required")
+    else:
+        res.set_status(403, "Forbidden")
+        res.text("invalid 2FA code")
+    handler.request.sendall(res.to_data())
 
 
 def auth_controller(request, handler):
@@ -78,6 +91,14 @@ def auth_controller(request, handler):
             handler.request.sendall(res.to_data())
             return
 
+        credentials = extract_credentials(request)
+        if credentials[1] != "": #a new password needs the current 2FA code, a username-only change doesn't
+            totp_code = credentials[2] if len(credentials) > 2 else None
+            totp_result = check_current_totp(user_id, totp_code)
+            if totp_result != TOTP_OK:
+                send_totp_failure(res, handler, totp_result)
+                return
+
         result = update_user_profile(user_id, request) #pass it on to service layer
         if result:
             res.set_status(200, "OK")
@@ -93,14 +114,19 @@ def auth_controller(request, handler):
     if method == "POST" and path == "/api/totp/enable":
         auth_token = cookies.get("auth_token", "")
         payload = verify_jwt(auth_token)
-        username = payload.get("username") if payload else None
-        if not username:
+        user_id = payload.get("sub") if payload else None #id, not username: the token's username goes stale after a rename
+        if not user_id:
             res.set_status(401, "Unauthorized") #not logged in
             res.json({})
             handler.request.sendall(res.to_data())
             return
 
-        totp_secret = enable_otp_db(username) #recieve totp secret from backend
+        totp_result = check_current_totp(user_id, extract_totp_code(request)) #replacing 2FA needs the current 2FA
+        if totp_result != TOTP_OK:
+            send_totp_failure(res, handler, totp_result)
+            return
+
+        totp_secret = enable_otp_db(user_id) #recieve totp secret from backend
         res.set_status(200, "OK")
         res.json({"secret": totp_secret}) #send to front end to generate qr code
         handler.request.sendall(res.to_data())
