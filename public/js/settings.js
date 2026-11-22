@@ -67,6 +67,15 @@ async function handleSubmit(event) {
   }
 }
 
+// Build a QR code image as a data: URL using the vendored library in
+// /public/js/vendor/qrcode.js. Type 0 = auto-size, "M" = medium error correction.
+function buildQrDataUrl(text) {
+  const qr = qrcode(0, "M");
+  qr.addData(text);
+  qr.make();
+  return qr.createDataURL(6, 4);
+}
+
 const dialog = document.getElementById("twoFactorDialog");
 const enable2faBtn = document.getElementById("enable2fa");
 const closeDialogBtn = document.getElementById("closeDialog");
@@ -104,10 +113,9 @@ enable2faBtn.addEventListener("click", async () => {
   // Generate otpauth URL for QR code
   const otpauthUrl = `otpauth://totp/418site:${encodeURIComponent(`${storedUserSettings.username}@418site.com`)}?secret=${secret}&issuer=YourApp`;
 
-  // Set QR code image
-  qrCodeImg.src = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(
-    otpauthUrl
-  )}`;
+  // Render the QR code locally so the TOTP secret never leaves the browser
+  // (SD-17: it used to be sent to a third-party QR image service).
+  qrCodeImg.src = buildQrDataUrl(otpauthUrl);
 
   // Display secret code
   secretCodeElement.textContent = secret;
