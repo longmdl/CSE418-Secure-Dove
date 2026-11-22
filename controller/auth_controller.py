@@ -1,5 +1,5 @@
 from util.response import Response
-from service.auth_service import get_user_profile, get_user_search, update_user_profile, check_current_totp, TOTP_OK, TOTP_MISSING, TOTP_LOCKED
+from service.auth_service import get_user_profile, get_user_search, update_user_profile, check_current_totp, confirm_new_totp, TOTP_OK, TOTP_MISSING, TOTP_LOCKED, TOTP_NO_PENDING
 from repository.auth_repository import enable_otp_db
 from util.auth import verify_jwt, extract_credentials, extract_totp_code
 
@@ -11,6 +11,9 @@ def send_totp_failure(res, handler, result):
     elif result == TOTP_MISSING:
         res.set_status(403, "Forbidden")
         res.text("2FA code required")
+    elif result == TOTP_NO_PENDING:
+        res.set_status(400, "Bad Request")
+        res.text("no new 2FA secret to confirm, regenerate 2FA first")
     else:
         res.set_status(403, "Forbidden")
         res.text("invalid 2FA code")
@@ -126,8 +129,28 @@ def auth_controller(request, handler):
             send_totp_failure(res, handler, totp_result)
             return
 
-        totp_secret = enable_otp_db(user_id) #recieve totp secret from backend
+        totp_secret = enable_otp_db(user_id) #new secret, pending until /api/totp/confirm
         res.set_status(200, "OK")
         res.json({"secret": totp_secret}) #send to front end to generate qr code
+        handler.request.sendall(res.to_data())
+        return
+
+    if method == "POST" and path == "/api/totp/confirm": #switch on the secret from /api/totp/enable
+        auth_token = cookies.get("auth_token", "")
+        payload = verify_jwt(auth_token)
+        user_id = payload.get("sub") if payload else None
+        if not user_id:
+            res.set_status(401, "Unauthorized") #not logged in
+            res.json({})
+            handler.request.sendall(res.to_data())
+            return
+
+        totp_result = confirm_new_totp(user_id, extract_totp_code(request)) #code must come from the NEW authenticator entry
+        if totp_result != TOTP_OK:
+            send_totp_failure(res, handler, totp_result)
+            return
+
+        res.set_status(200, "OK")
+        res.text("2FA updated")
         handler.request.sendall(res.to_data())
         return

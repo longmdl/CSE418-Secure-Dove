@@ -149,7 +149,10 @@ function buildQrDataUrl(text) {
 const dialog = document.getElementById("twoFactorDialog");
 const enable2faBtn = document.getElementById("enable2fa");
 const closeDialogBtn = document.getElementById("closeDialog");
-const doneButton = document.getElementById("doneButton");
+const confirmForm = document.getElementById("twoFactorConfirmForm");
+const confirmButton = document.getElementById("confirmNewTotp");
+const newTotpInput = document.getElementById("newTotpInput");
+const newTotpError = document.getElementById("newTotpError");
 const qrCodeImg = document.getElementById("qrCode");
 const secretCodeElement = document.getElementById("secretCode");
 const form = document.querySelector("form");
@@ -207,7 +210,7 @@ enable2faBtn.addEventListener("click", async () => {
     return;
   }
   const secret = totpBody.secret;
-  storedUserSettings.totp_enabled = true; // the new secret is live, later sensitive actions on this page need it
+  // Not live yet: the server keeps the old 2FA (or none) until the new code is confirmed below.
 
   // Generate otpauth URL for QR code
   const otpauthUrl = `otpauth://totp/418site:${encodeURIComponent(`${storedUserSettings.username}@418site.com`)}?secret=${secret}&issuer=YourApp`;
@@ -220,16 +223,79 @@ enable2faBtn.addEventListener("click", async () => {
   secretCodeElement.textContent = secret;
 
   // Show dialog
+  newTotpInput.value = "";
+  newTotpError.classList.add("hidden");
   dialog.classList.remove("hidden");
+  newTotpInput.focus();
 });
 
-// Close dialog
-function closeDialog() {
-  dialog.classList.add("hidden");
+function showNewTotpError(message) {
+  newTotpError.textContent = message;
+  newTotpError.classList.remove("hidden");
 }
 
-closeDialogBtn.addEventListener("click", closeDialog);
-doneButton.addEventListener("click", closeDialog);
+// Confirm: the user proves they saved the new secret by entering a code from it.
+// Only then does the server switch 2FA over, so an unsaved QR code can't lock them out.
+let confirmingNewTotp = false;
+confirmForm.addEventListener("submit", async (event) => {
+  event.preventDefault();
+  if (confirmingNewTotp) {
+    return;
+  }
+
+  const code = newTotpInput.value.replace(/\s/g, "");
+  if (!/^\d{6}$/.test(code)) {
+    showNewTotpError("Enter the 6-digit code from your authenticator app.");
+    return;
+  }
+
+  confirmingNewTotp = true;
+  confirmButton.disabled = true;
+  try {
+    const response = await fetch("/api/totp/confirm", {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ totp: code }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      showNewTotpError(
+        response.status === 403
+          ? "That code doesn't match the new QR code. Make sure you saved the new entry and are reading its code."
+          : errorText || "Could not confirm the new 2FA code."
+      );
+      newTotpInput.value = "";
+      newTotpInput.focus();
+      return;
+    }
+
+    storedUserSettings.totp_enabled = true; // the new secret is live, later sensitive actions on this page need it
+    dialog.classList.add("hidden");
+    alertManager.newAlert(
+      "Your new 2FA is active. Use codes from the new entry from now on.",
+      "success",
+      5000,
+      "2FA Updated"
+    );
+  } catch (error) {
+    showNewTotpError("Failed to confirm 2FA. Please try again.");
+  } finally {
+    confirmingNewTotp = false;
+    confirmButton.disabled = false;
+  }
+});
+
+// Cancel: nothing was switched on, so the old 2FA (or none) stays in place.
+closeDialogBtn.addEventListener("click", () => {
+  dialog.classList.add("hidden");
+  alertManager.newAlert(
+    "2FA was not changed. Your previous setup is still active.",
+    "info",
+    5000,
+    "2FA Unchanged"
+  );
+});
 
 
 fetchUserSettings();

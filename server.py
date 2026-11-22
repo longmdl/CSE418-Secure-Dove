@@ -46,6 +46,7 @@ class MyTCPHandler(socketserver.BaseRequestHandler):
         self.router.add_route("GET", "/api/users/", key_controller, False)
 
         self.router.add_route("POST", "/api/totp/enable", auth_controller, True)
+        self.router.add_route("POST", "/api/totp/confirm", auth_controller, True)
 
         self.router.add_route("GET", "/websocket", websocket_controller, True)
 
