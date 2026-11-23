@@ -1,3 +1,7 @@
+import os
+
+PUBLIC_DIR = os.path.realpath("public")
+
 PAGES = {
     "/": "public/index.html",
     "/chat": "public/chat.html",
@@ -11,11 +15,18 @@ PAGES = {
 def static_service(path):
     if path.startswith("/"):
         path = path[1:]
+
+    file_path = os.path.realpath(path)
+
+    #Ensure the requested file is inside the public directory
+    if os.path.commonpath([PUBLIC_DIR, file_path]) != PUBLIC_DIR:
+        return b"file not found"
+
     data = b""
     try:
-        with open(path, 'rb') as f:
+        with open(file_path, 'rb') as f:
             data = f.read() #read file from the given path as bytes
-    except FileNotFoundError:
+    except (FileNotFoundError, IsADirectoryError):
         data = b"file not found" #send back a file not found in bytes
     return data
 
