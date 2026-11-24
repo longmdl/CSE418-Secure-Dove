@@ -51,3 +51,24 @@ You need Docker and `openssl`.
    ```bash
    docker compose exec mongo mongo cse418 --quiet --eval 'db.messages.find({}, {_id:0, ciphertext:1, iv:1}).forEach(printjson)'
    ```
+
+
+## Security countermeasures (Milestone 4)
+
+After our paired team's Milestone 3 attacks, we hardened SecureDove:
+
+- 2FA secret never leaves the browser: the enrollment QR code is generated
+  locally (public/js/vendor/qrcode.js); nothing is sent to an external QR service.
+- Account actions are keyed on the immutable account id (JWT "sub"), not the
+  username, so a renamed or replayed session can only affect its own account.
+- 2FA regeneration uses a pending secret confirm: the old code keeps working
+  until a code from the new secret is verified.
+- Static file serving is confined to the public/ directory; path traversal
+  (e.g. /public/../../etc/passwd) is rejected.
+  - Usernames are unique at the database layer (unique index), closing the
+  registration race that could create duplicate accounts.
+
+Regression tests:
+  python3 tests/traversal/test_traversal.py          # traversal blocked (5/5)
+  python3 tests/totp_identity/test_totp_identity.py   # 2FA identity (4/4)
+  node tests/qr/run-node.mjs                          # no external QR service
